@@ -63,6 +63,11 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
 # php-kafka-poc
+
+Install docker and docker compose
+
+Run `docker compose up -d` to contanerise
+
 Open the confluent dashboard in a new tab - http://localhost:9021/
 
 Open this url to produce the message - http://localhost:3000/kafka
