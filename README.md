@@ -63,3 +63,17 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
 # php-kafka-poc
+Open the confluent dashboard in a new tab - http://localhost:9021/
+
+Open this url to produce the message - http://localhost:3000/kafka
+
+Open this to consume the messages - http://localhost:3000/consume
+
+##
+To check the consumed messages open the laravel logs in a terminal. Run below commands:
+
+`docker compose exec app bash`
+
+`cd storage/logs/`
+
+`tail -f -n10 laravel.log`
