@@ -68,6 +68,8 @@ Install docker and docker compose
 
 Run `docker compose up -d` to contanerise
 
+Run `docker compose run app composer install` to install the composer inside container
+
 Open the confluent dashboard in a new tab - http://localhost:9021/
 
 Open this url to produce the message - http://localhost:3000/kafka
