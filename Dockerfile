@@ -23,6 +23,7 @@ RUN git clone https://github.com/edenhill/librdkafka.git \
     && pecl install rdkafka \
     && docker-php-ext-enable rdkafka
 
+RUN pecl install simple_kafka_client
 RUN useradd -G www-data,root -u $uid -d /home/$user $user
 RUN mkdir -p /home/$user/.composer && \
     chown -R $user:$user /home/$user

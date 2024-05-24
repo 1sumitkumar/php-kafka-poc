@@ -3,12 +3,13 @@
 namespace App\Handlers;
 
 use Illuminate\Support\Facades\Log;
-use Junges\Kafka\Contracts\KafkaConsumerMessage;
+use Junges\Kafka\Contracts\ConsumerMessage;
+use Junges\Kafka\Contracts\MessageConsumer;
 
 class TestHandler
 {
-    public function __invoke(KafkaConsumerMessage $message)
-    {
+    public function __invoke(\Junges\Kafka\Contracts\ConsumerMessage $message, \Junges\Kafka\Contracts\MessageConsumer $consumer) {
+        // Handle your message here
         Log::debug('Message received!', [
             'body' => $message->getBody(),
             'headers' => $message->getHeaders(),

@@ -16,22 +16,25 @@ use FlixTech\SchemaRegistryApi\Registry\CachedRegistry;
 use FlixTech\SchemaRegistryApi\Registry\PromisingRegistry;
 use FlixTech\SchemaRegistryApi\Registry\BlockingRegistry;
 use FlixTech\AvroSerializer\Objects\RecordSerializer;
+use FlixTech\AvroSerializer\Objects\Schema;
+
 use Junges\Kafka\Message\KafkaAvroSchema;
 use Junges\Kafka\Message\Registry\AvroSchemaRegistry;
+use Junges\Kafka\Contracts\KafkaAvroSchemaRegistry;
+use Junges\Kafka\Handlers\RetryableHandler;
+use Junges\Kafka\Handlers\RetryStrategies\DefaultRetryStrategy;
+use Junges\Kafka\Commit\NativeSleeper;
+
+
+use Junges\Kafka\Message\Serializers\AvroSerializer;
+use Junges\Kafka\Message\Deserializers\AvroDeserializer;
 
 use GuzzleHttp\Client;
 class KafkaController extends Controller
 {
     public function index()
     {
-        //            Kafka::publishOn('test-topic')
-        //                ->withKafkaKey(Str::uuid())
-        //                ->withBodyKey('foo', 'bar')
-        //                ->withHeaders([
-        //                    'foo-header' => 'foo-value'
-        //                ])
-        //                ->send();
-                echo 'I am the producer';
+        echo 'I am the producer' . "\n\n" . "</br></br>";
         $cachedRegistry = new CachedRegistry(
             new BlockingRegistry(
                 new PromisingRegistry(
@@ -42,68 +45,58 @@ class KafkaController extends Controller
         );
 
         $registry = new AvroSchemaRegistry($cachedRegistry);
-        $recordSerializer = new RecordSerializer($cachedRegistry);
+        $recordSerializer = new RecordSerializer($cachedRegistry,  [
+            // If you want to auto-register missing schemas set this to true
+            RecordSerializer::OPTION_REGISTER_MISSING_SCHEMAS => true,
+            // If you want to auto-register missing subjects set this to true
+            RecordSerializer::OPTION_REGISTER_MISSING_SUBJECTS => true,
+        ]);
 
-        //if no version is defined, latest version will be used
-        //if no schema definition is defined, the appropriate version will be fetched form the registry
+        $topic = 'test-topic';
+        $version = 1;
+
+        $subject = $topic . '-value';
+
+        $avroSchema = '{
+          "type": "record",
+          "name": "user",
+          "fields": [
+            {"name": "firstName", "type": "string"},
+            {"name": "lastName", "type": "string"},
+            {"name": "age", "type": "int"}
+          ]
+        }';
+
+        echo "Avro Schema>>>>>: ";
+        dump($avroSchema);
+
         $registry->addBodySchemaMappingForTopic(
-            'test-topic',
-            new \Junges\Kafka\Message\KafkaAvroSchema('test_topic_value' /*, int $version, AvroSchema $definition */)
-        );
-        $registry->addKeySchemaMappingForTopic(
-            'test-topic',
-            new \Junges\Kafka\Message\KafkaAvroSchema('test_topic_value' /*, int $version, AvroSchema $definition */)
+            $topic,
+            new \Junges\Kafka\Message\KafkaAvroSchema($subject, $version)
         );
 
-        $serializer = new \Junges\Kafka\Message\Serializers\AvroSerializer($registry, $recordSerializer /*, AvroEncoderInterface::ENCODE_BODY */);
-
-        //        $message = new Message(
-        //            headers: ['header-key' => 'header-value'],
-        //            body: ['key' => 'value'],
-        //            key: 'kafka key here'
-        //        );
-       // $producer = \Junges\Kafka\Facades\Kafka::publishOn('test-topic')->withDebugEnabled()->withMessage($message)->usingSerializer($serializer);
-
+        $serializer = new \Junges\Kafka\Message\Serializers\AvroSerializer($registry, $recordSerializer);
         $message = new Message(
+            headers: ['some' => 'test header'],
             body: [
-                "id" =>  1,
-                "statusId" => 3,
-                "statusCode" =>  "RESOLVED"
+                'firstName' => 'John',
+                'lastName' => 'Doe',
+                'age' => 42,
             ]
         );
-
-
-        //Kafka::publishOn('topic')->withMessage($message)->usingSerializer($serializer)->send();
-        $producer = Kafka::publishOn('test-topic')->withMessage($message); #->usingSerializer($serializer);
-
+        echo "Body>>>>>>>:  ";
+        dump( $message);
+        $producer = \Junges\Kafka\Facades\Kafka::publish('broker:29092')->onTopic($topic)->withMessage($message)->usingSerializer($serializer);
         $producer->send();
-
         echo "PUBLISHED";
         die;
     }
 
     public function consume(){
 
-        echo "Consuming";
         echo 'I am the consumer';
         \Log::info('This is some useful information.');
         Log::debug('This is just to test');
-        //$consumer = Kafka::createConsumer(['test-topic'], 'group', 'broker:29092')->stopAfterLastMessage();
-        //            ->withBrokers('broker:29092')
-        //            ->withAutoCommit()
-        //            ->withHandler(function(ConsumerMessage $message, MessageConsumer $consumer) {
-        //                // Handle your message here
-        //            })
-        //            ->build();
-        //
-        //       $consumer->withHandler(function(ConsumerMessage $message, MessageConsumer $consumer) {
-        //                // Handle your message here
-        //           echo "<pre>";
-        //           print_r($message);
-        //           echo "</pre>";
-        //            echo "dadsdsdsd";
-        //            })->build()->consume();
-
         $cachedRegistry = new CachedRegistry(
             new BlockingRegistry(
                 new PromisingRegistry(
@@ -115,20 +108,27 @@ class KafkaController extends Controller
 
         $registry = new \Junges\Kafka\Message\Registry\AvroSchemaRegistry($cachedRegistry);
         $recordSerializer = new RecordSerializer($cachedRegistry);
+        $topic = 'test-topic';
+        $version = 1;
         $registry->addBodySchemaMappingForTopic(
             'test-topic',
-            new KafkaAvroSchema('test_topic_value' )
+            new KafkaAvroSchema($topic.'-value', $version /*,AvroSchema $definition */ )
         );
-        $consumer = Kafka::createConsumer(['test-topic'], 'group', 'broker:29092')->stopAfterLastMessage();
-        $deserializer = new \Junges\Kafka\Message\Deserializers\AvroDeserializer($registry, $recordSerializer);
-        $consumer = Kafka::createConsumer()
-            ->subscribe('test-topic')
+        $registry->addKeySchemaMappingForTopic(
+            'test-topic',
+            new KafkaAvroSchema($topic.'-value', $version /*,AvroSchema $definition */)
+        );
+        $deserializer = new \Junges\Kafka\Message\Deserializers\AvroDeserializer($registry, $recordSerializer /*, AvroDecoderInterface::DECODE_BODY */);
+        $consumer = Kafka::consumer(['test-topic'], 'group', 'broker:29092')->stopAfterLastMessage()
+            ->withOptions([
+                'auto.offset.reset' => 'earliest'
+            ])
+            ->usingDeserializer($deserializer)
             ->withHandler(new TestHandler)
-            ->withAutoCommit()
             ->build();
 
         $consumer->consume();
-
+        echo "Consuming" . "</br></br>";
         die;
     }
 }
